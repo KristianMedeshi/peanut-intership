@@ -2,15 +2,23 @@
   "name": "intership",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "type": "module",
+  "main": "src/index.ts",
   "directories": {
     "doc": "docs",
-    "test": "tests"
+    "test": "src/tests"
   },
   "scripts": {
     "build": "tsc",
+    "compile": "tsc --noEmit",
     "start": "node dist/index.js",
-    "dev": "ts-node-dev --respawn src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "analyze:tx": "tsx src/chain/analyzer/entry.ts",
+    "create:wallet": "tsx src/scripts/create_wallet.ts",
+    "integration:dry-run": "INTEGRATION_BROADCAST=false tsx src/scripts/integration_test.ts",
+    "integration:sepolia": "INTEGRATION_BROADCAST=true tsx src/scripts/integration_test.ts",
+    "integration:analyzer": "tsx src/scripts/integration_analyzer_samples.ts",
+    "integration:pending": "tsx src/scripts/integration_pending_monitor.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -28,8 +36,9 @@
     "@types/supertest": "^7.2.0",
     "@vitest/coverage-v8": "^4.1.2",
     "dotenv": "^17.3.1",
-    "eslint": "^10.1.0",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
@@ -37,11 +46,13 @@
     "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.6",
     "typescript": "~5.4.5",
     "typescript-eslint": "^8.57.2",
     "vitest": "^4.1.2"
   },
   "dependencies": {
+    "ethers": "^6.16.0",
     "express": "^5.2.1"
   }
 }
