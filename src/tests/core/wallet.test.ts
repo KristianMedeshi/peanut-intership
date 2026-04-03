@@ -1,3 +1,4 @@
+import { TypedDataEncoder } from 'ethers';
 import { readFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -682,5 +683,92 @@ describe('WalletManager', () => {
 
       await unlink(tmpPath);
     }, 30000);
+  });
+
+  // ==========================================
+  // EIP-712 Canonicalization
+  // ==========================================
+  describe('signTypedData: Canonicalization (EIP-712)', () => {
+    const domain = { name: 'TestApp', version: '1', chainId: 1 };
+    const types = {
+      Order: [
+        { name: 'price', type: 'uint256' },
+        { name: 'amount', type: 'uint256' },
+      ],
+    };
+
+    it('should produce identical hashes regardless of object key order (JS Engine bypass)', async () => {
+      // Object A: price then amount
+      const dataA = { price: 100n, amount: 5n };
+
+      // Object B: amount then price (Logically identical)
+      const dataB = { amount: 5n, price: 100n };
+
+      const resultA = await wallet.signTypedData(domain, types, dataA);
+      const resultB = await wallet.signTypedData(domain, types, dataB);
+
+      // The hashes must match exactly
+      expect(resultA.messageHash).toBe(resultB.messageHash);
+      expect(resultA.signature).toBe(resultB.signature);
+    });
+
+    it('should match the standard EIP-712 hash calculation', async () => {
+      const value = { price: 100n, amount: 5n };
+      const result = await wallet.signTypedData(domain, types, value);
+
+      // Verify against the official ethers encoder utility directly
+      const expectedHash = TypedDataEncoder.hash(domain, types, value);
+
+      expect(result.messageHash).toBe(expectedHash);
+    });
+  });
+
+  // ==========================================
+  // Transaction RLP Determinism
+  // ==========================================
+  describe('signTransaction: RLP Serialization Determinism', () => {
+    it('should produce identical raw transaction bytes regardless of input object order', async () => {
+      const txA = {
+        to: '0x0000000000000000000000000000000000000000',
+        value: 1000n,
+        gasLimit: 21000n,
+        nonce: 1,
+      };
+
+      const txB = {
+        nonce: 1,
+        gasLimit: 21000n,
+        value: 1000n,
+        to: '0x0000000000000000000000000000000000000000',
+      };
+
+      const resultA = await wallet.signTransaction(txA);
+      const resultB = await wallet.signTransaction(txB);
+
+      // RLP encoding must be deterministic
+      expect(resultA.rawTransaction).toBe(resultB.rawTransaction);
+      expect(resultA.transactionHash).toBe(resultB.transactionHash);
+    });
+  });
+
+  // ==========================================
+  // EIP-191 Prefixing (Message Signing)
+  // ==========================================
+  describe('signMessage: Prefix consistency', () => {
+    it('should correctly include the Ethereum Signed Message prefix in the hash', async () => {
+      const message = 'Hello World';
+      const result = await wallet.signMessage(message);
+
+      // The messageHash should NOT be a simple keccak256(message)
+      // It must be keccak256("\x19Ethereum Signed Message:\n" + len(message) + message)
+      // verifyMessage will fail if the prefixing is inconsistent
+      const isValid = WalletManager.verifySignedMessage(
+        message,
+        result.signature,
+        wallet.address,
+      );
+
+      expect(isValid).toBe(true);
+    });
   });
 });
